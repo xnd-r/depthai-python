@@ -53,10 +53,17 @@ task waits for this semaphore to be given before queueing a transmission.
 Pins in use. The SPI Master can use the GPIO mux, so feel free to change these if needed.
 */
 #define GPIO_HANDSHAKE 2
+#if 0 // original config in esp-idf example
 #define GPIO_MOSI 12
 #define GPIO_MISO 13
 #define GPIO_SCLK 15
 #define GPIO_CS 14
+#else // GPIOs used in the upcoming board: DepthAI with ESP-WROOM-32
+#define GPIO_MOSI 13
+#define GPIO_MISO 12
+#define GPIO_SCLK 14
+#define GPIO_CS 15
+#endif
 
 //The semaphore indicating the slave is ready to receive stuff.
 static xQueueHandle rdySem;
@@ -100,7 +107,7 @@ void app_main()
         .command_bits=0,
         .address_bits=0,
         .dummy_bits=0,
-        .clock_speed_hz=5000000,
+        .clock_speed_hz=100000, // TODO
         .duty_cycle_pos=128,        //50% duty cycle
         .mode=0,
         .spics_io_num=GPIO_CS,
@@ -117,8 +124,8 @@ void app_main()
     };
 
     int n=0;
-    char sendbuf[128] = {0};
-    char recvbuf[128] = {0};
+    static char sendbuf[256] = {0};
+    static char recvbuf[256] = {0};
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
 
@@ -142,8 +149,7 @@ void app_main()
     xSemaphoreGive(rdySem);
 
     while(1) {
-        int res = snprintf(sendbuf, sizeof(sendbuf),
-                "Sender, transmission no. %04i. Last time, I received: \"%s\"", n, recvbuf);
+        int res = snprintf(sendbuf, sizeof(sendbuf), "esp32-cnt:%d", n);
         if (res >= sizeof(sendbuf)) {
             printf("Data truncated\n");
         }
@@ -151,9 +157,13 @@ void app_main()
         t.tx_buffer=sendbuf;
         t.rx_buffer=recvbuf;
         //Wait for slave to be ready for next byte before sending
+#if 0 // TODO: implement an interrupt GPIO output from DepthAI
         xSemaphoreTake(rdySem, portMAX_DELAY); //Wait until slave is ready
+#else
+        vTaskDelay(30 / portTICK_PERIOD_MS);
+#endif
         ret=spi_device_transmit(handle, &t);
-        printf("Received: %s\n", recvbuf);
+        printf("[RECV-%d] %s\n", n, recvbuf);
         n++;
     }
 
