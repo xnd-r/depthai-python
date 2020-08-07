@@ -18,9 +18,7 @@
 #include "../core/host_data_reader.hpp"
 #include "../core/nnet/tensor_info.hpp"
 #include "../core/nnet/tensor_info_helper.hpp"
-#include "../core/nnet/tensor_entry.hpp"
 #include "../core/nnet/nnet_packet.hpp"
-#include "../core/nnet/tensor_entry_container.hpp"
 #include "../core/pipeline/host_pipeline.hpp"
 #include "../core/pipeline/host_pipeline_config.hpp"
 #include "../core/pipeline/cnn_host_pipeline.hpp"
@@ -394,36 +392,35 @@ std::shared_ptr<CNNHostPipeline> create_pipeline(
 
         // read tensor info
         std::vector<TensorInfo>       tensors_info;
-        if (parseTensorInfosFromJsonFile(config.ai.blob_file_config, tensors_info))
-        {
-            std::cout << "CNN configurations read: " << config.ai.blob_file_config.c_str() << "\n";
-        }
-        else
-        {
-            std::cerr << WARNING "ERROR: There is no cnn configuration file or error in it\'s parsing: " << config.ai.blob_file_config.c_str() << "\n";
-            break;
-        }
+        // if (parseTensorInfosFromJsonFile(config.ai.blob_file_config, tensors_info))
+        // {
+        //     std::cout << "CNN configurations read: " << config.ai.blob_file_config.c_str() << "\n";
+        // }
+        // else
+        // {
+        //     std::cerr << WARNING "ERROR: There is no cnn configuration file or error in it\'s parsing: " << config.ai.blob_file_config.c_str() << "\n";
+        //     break;
+        // }
 
-        if (num_stages > 1)
-        {
-            if (parseTensorInfosFromJsonFile(config.ai.blob_file_config2, tensors_info))
-            {
-                std::cout << "CNN configurations read: " << config.ai.blob_file_config2.c_str() << "\n";
-            }
-            else
-            {
-                std::cout << "There is no cnn configuration file or error in it\'s parsing: " << config.ai.blob_file_config2.c_str() << "\n";
-            }
-        }
+        // if (num_stages > 1)
+        // {
+        //     if (parseTensorInfosFromJsonFile(config.ai.blob_file_config2, tensors_info))
+        //     {
+        //         std::cout << "CNN configurations read: " << config.ai.blob_file_config2.c_str() << "\n";
+        //     }
+        //     else
+        //     {
+        //         std::cout << "There is no cnn configuration file or error in it\'s parsing: " << config.ai.blob_file_config2.c_str() << "\n";
+        //     }
+        // }
 
 
         // pipeline configurations json
-        // homography
+        // default homography
         std::vector<float> homography_buff = {
-            // default for BW0250TG:
-             9.8806816e-01,  2.9474013e-03,  5.0676174e+00,
-            -8.7650679e-03,  9.9214733e-01, -8.7952757e+00,
-            -8.4495878e-06, -3.6034894e-06,  1.0000000e+00
+             1,  0,  0,
+             0,  1,  0,
+             0,  0,  1
         };
         bool stereo_center_crop = false;
 
@@ -647,17 +644,55 @@ std::shared_ptr<CNNHostPipeline> create_pipeline(
                 //TODO: remove asserts considering StreamInfo size
                 outBlob.size = 1;
 
-                cnn_info cnn_input_info;
+                cnn_info cnn_input_info = {};
+                cnn_tensor_infos tensor_infos;
+                
 
-                static char cnn_info_arr[sizeof(cnn_info)];
                 g_xlink->openReadAndCloseStream(
                     outBlob,
-                    (void*)cnn_info_arr,
-                    sizeof(cnn_info)
+                    (void*)&tensor_infos,
+                    sizeof(tensor_infos)
                     );
 
-                memcpy(&cnn_input_info, &cnn_info_arr, sizeof(cnn_input_info));
-
+                printf("input \n");
+                for(int _i = 0; _i < tensor_infos.input_size; _i++)
+                {
+                    printf("idx %d \n", (int)tensor_infos.input_info[_i].idx);
+                    printf("offset %d \n", (int)tensor_infos.input_info[_i].offset);
+                    printf("name %s \n", tensor_infos.input_info[_i].name);
+                    printf("dataType %d \n", (int)tensor_infos.input_info[_i].shape.dataType);
+                    printf("numDims %d \n", (int)tensor_infos.input_info[_i].shape.numDims);
+                    printf("dims \n");
+                    for (int i = 0; i < (int)tensor_infos.input_info[_i].shape.numDims; i++)
+                    {
+                        printf("%d ", (int)tensor_infos.input_info[_i].shape.dims[i]);
+                    }
+                    printf("\n\n");
+                }
+                printf("output \n");
+                for(int _i = 0; _i < tensor_infos.output_size; _i++)
+                {
+                    TensorInfo t_info(tensor_infos.output_info[_i]);
+                    tensors_info.push_back(t_info);
+                    printf("idx %d \n", (int)tensor_infos.output_info[_i].idx);
+                    printf("offset %d \n", (int)tensor_infos.output_info[_i].offset);
+                    printf("name %s \n", tensor_infos.output_info[_i].name);
+                    printf("dataType %d \n", (int)tensor_infos.output_info[_i].shape.dataType);
+                    printf("numDims %d \n", (int)tensor_infos.output_info[_i].shape.numDims);
+                    printf("dims \n");
+                    for (int i = 0; i < (int)tensor_infos.output_info[_i].shape.numDims; i++)
+                    {
+                        printf("%d ", (int)tensor_infos.output_info[_i].shape.dims[i]);
+                    }
+                    printf("\n\n");
+                }
+                
+                cnn_input_info.cnn_input_width = tensor_infos.input_info[0].shape.dims[tensor_infos.input_info[0].shape.numDims-1];
+                cnn_input_info.cnn_input_height = tensor_infos.input_info[0].shape.dims[tensor_infos.input_info[0].shape.numDims-2];
+                cnn_input_info.cnn_input_num_channels = tensor_infos.input_info[0].shape.dims[tensor_infos.input_info[0].shape.numDims-3];
+                cnn_input_info.satisfied_resources = tensor_infos.satisfied_resources;
+                cnn_input_info.nn_to_depth = tensor_infos.nn_to_depth;
+                
                 printf("CNN input width: %d\n", cnn_input_info.cnn_input_width);
                 printf("CNN input height: %d\n", cnn_input_info.cnn_input_height);
                 printf("CNN input num channels: %d\n", cnn_input_info.cnn_input_num_channels);
@@ -674,14 +709,13 @@ std::shared_ptr<CNNHostPipeline> create_pipeline(
                     nn_to_depth_mapping["max_h"] = cnn_input_info.nn_to_depth.max_height;
                 }
                 // update tensor infos
-                assert(!(tensors_info.size() > (sizeof(cnn_input_info.offsets)/sizeof(cnn_input_info.offsets[0]))));
+                // assert(!(tensors_info.size() > (sizeof(cnn_input_info.offsets)/sizeof(cnn_input_info.offsets[0]))));
 
                 if (stage == 0) {
                     for (int i = 0; i < tensors_info.size(); i++)
                     {
                         tensors_info[i].nnet_input_width  = cnn_input_info.cnn_input_width;
                         tensors_info[i].nnet_input_height = cnn_input_info.cnn_input_height;
-                        tensors_info[i].offset = cnn_input_info.offsets[i];
                     }
 
                     c_streams_myriad_to_pc["previewout"].dimensions = {
@@ -708,7 +742,7 @@ std::shared_ptr<CNNHostPipeline> create_pipeline(
                 if(!cnn_input_info.satisfied_resources)
                 {
                     std::cerr << WARNING "ERROR: requested CNN resources overlaps with RGB camera \n" ENDC;
-                    break;
+                    return nullptr;
                 }
 
             }
@@ -989,50 +1023,11 @@ PYBIND11_MODULE(depthai, m)
     py::class_<NNetPacket, std::shared_ptr<NNetPacket>>(m, "NNetPacket")
         .def("get_tensor", &NNetPacket::getTensor, py::return_value_policy::copy)
         .def("get_tensor", &NNetPacket::getTensorByName, py::return_value_policy::copy)
-        .def("entries", &NNetPacket::getTensorEntryContainer, py::return_value_policy::copy)
         .def("getMetadata", &NNetPacket::getMetadata, py::return_value_policy::copy)
+        .def("getOutputs", &NNetPacket::getOutputs, py::return_value_policy::copy)     
+        .def("getTensorsSize", &NNetPacket::getTensorsSize, py::return_value_policy::copy)     
+         
         ;
-
-    // for te in nnet_packet.ENTRIES()
-    py::class_<TensorEntryContainer, std::shared_ptr<TensorEntryContainer>>(m, "TensorEntryContainer")
-        .def("__len__", &TensorEntryContainer::size)
-        .def("__getitem__", &TensorEntryContainer::getByIndex)
-        .def("__getitem__", &TensorEntryContainer::getByName)
-        .def("__iter__", [](py::object s) { return PyTensorEntryContainerIterator(s.cast<TensorEntryContainer &>(), s); })
-        ;
-
-    // for e in nnet_packet.entries():
-    //     e <--- (type(e) == list)
-    py::class_<PyTensorEntryContainerIterator>(m, "PyTensorEntryContainerIterator")
-        .def("__iter__", [](PyTensorEntryContainerIterator &it) -> PyTensorEntryContainerIterator& { return it; })
-        .def("__next__", &PyTensorEntryContainerIterator::next)
-        ;
-
-    // for e in nnet_packet.entries():
-    //     e[0] <--
-    py::class_<TensorEntry, std::shared_ptr<TensorEntry>>(m, "TensorEntry")
-        .def("__len__", &TensorEntry::getPropertiesNumber)
-        .def("__getitem__", &TensorEntry::getFloat)
-        .def("__getitem__", &TensorEntry::getFloatByIndex)
-        ;
-
-
-    // while True:
-    //     nnet_packets, data_packets = p.get_available_nnet_and_data_packets()
-    //     # nnet_packets: depthai.NNetPacketList
-    //     # data_packets: depthai.DataPacketList
-
-    //     for t in nnet_packets.getTensors():
-    //         pass
-
-    //     for nnet_packet in nnet_packets:
-    //         # nnet_packet: depthai.NNetPacket
-    //         # nnet_packet.entries(): depthai.TensorEntryContainer
-
-    //         for e in nnet_packet.entries():
-    //             # e: list
-    //             # e[0]: depthai.TensorEntry
-    //             # e[0][0]: float
 
 
     py::class_<HostPipeline>(m, "Pipeline")

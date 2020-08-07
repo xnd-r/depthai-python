@@ -14,7 +14,6 @@ class CNNHostPipeline
 private:
 
     const std::string               cnn_result_stream_name = "metaout";
-    const std::string               c_disparity_stream_name = "disparity";
 
     const std::vector<TensorInfo>   _tensors_info;
 
