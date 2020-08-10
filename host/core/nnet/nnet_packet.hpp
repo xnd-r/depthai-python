@@ -8,7 +8,7 @@
 
 #include "tensor_info.hpp"
 #include "../host_data_packet.hpp"
-
+#include "cnn_info.hpp"
 
 class NNetPacket
 {
@@ -114,13 +114,28 @@ public:
         return _tensors_info.size();
     }
 
+    int getDetectionCount()
+    {
+        unsigned char * data = _tensors_raw_data->data.data();
+        detection_out_t * detections = (detection_out_t *)data;
+        return detections->detection_count;
+    }
+
+#ifdef HOST_PYTHON_MODULE
+    py::object getDetectedObject(int detected_nr)
+    {
+        unsigned char * data = _tensors_raw_data->data.data();
+        detection_out_t * detections = (detection_out_t *)data;
+        assert(detected_nr < detections->detection_count);
+        return py::cast<detection_t>(detections->detections[detected_nr]);
+    }
+#endif
+
 private: 
     std::string getTensorName(int index)
     {
         return _tensors_info[index].tensor_name;
     }
-
-
 
 
 private:

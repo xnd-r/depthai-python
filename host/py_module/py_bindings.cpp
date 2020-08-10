@@ -392,28 +392,20 @@ std::shared_ptr<CNNHostPipeline> create_pipeline(
 
         // read tensor info
         std::vector<TensorInfo>       tensors_info;
-        // if (parseTensorInfosFromJsonFile(config.ai.blob_file_config, tensors_info))
-        // {
-        //     std::cout << "CNN configurations read: " << config.ai.blob_file_config.c_str() << "\n";
-        // }
-        // else
-        // {
-        //     std::cerr << WARNING "ERROR: There is no cnn configuration file or error in it\'s parsing: " << config.ai.blob_file_config.c_str() << "\n";
-        //     break;
-        // }
+        std::cout << config.ai.blob_file_config << std::endl;
+        std::ifstream jsonFile(config.ai.blob_file_config);
+        nlohmann::json json_NN_ = nlohmann::json::parse(jsonFile);
 
-        // if (num_stages > 1)
-        // {
-        //     if (parseTensorInfosFromJsonFile(config.ai.blob_file_config2, tensors_info))
-        //     {
-        //         std::cout << "CNN configurations read: " << config.ai.blob_file_config2.c_str() << "\n";
-        //     }
-        //     else
-        //     {
-        //         std::cout << "There is no cnn configuration file or error in it\'s parsing: " << config.ai.blob_file_config2.c_str() << "\n";
-        //     }
-        // }
-
+        nlohmann::json json_NN_meta;
+        if(!json_NN_.contains("NN_config"))
+        {
+            json_NN_meta["NN_config"]["output_format"] = "raw";
+        }
+        else
+        {
+            json_NN_meta = json_NN_["NN_config"];
+        }
+        
 
         // pipeline configurations json
         // default homography
@@ -546,6 +538,7 @@ std::shared_ptr<CNNHostPipeline> create_pipeline(
         json_config_obj["ai"]["camera_input"] = config.ai.camera_input;
         json_config_obj["ai"]["num_stages"] = num_stages;
 
+        json_config_obj["ai"]["NN_config"] = json_NN_meta;
         json_config_obj["ot"]["max_tracklets"] = config.ot.max_tracklets;
         json_config_obj["ot"]["confidence_threshold"] = config.ot.confidence_threshold;
 
@@ -1026,9 +1019,22 @@ PYBIND11_MODULE(depthai, m)
         .def("getMetadata", &NNetPacket::getMetadata, py::return_value_policy::copy)
         .def("getOutputs", &NNetPacket::getOutputs, py::return_value_policy::copy)     
         .def("getTensorsSize", &NNetPacket::getTensorsSize, py::return_value_policy::copy)     
-         
+        .def("getDetectionCount", &NNetPacket::getDetectionCount, py::return_value_policy::copy)
+        .def("getDetectedObject", &NNetPacket::getDetectedObject, py::return_value_policy::copy)       
         ;
 
+    py::class_<detection_t>(m, "Detection")
+        .def("get_label_id", &detection_t::get_label_id, py::return_value_policy::copy)
+        .def("get_score", &detection_t::get_score, py::return_value_policy::copy)
+        .def("get_xmin", &detection_t::get_xmin, py::return_value_policy::copy)
+        .def("get_xmax", &detection_t::get_xmax, py::return_value_policy::copy)
+        .def("get_ymin", &detection_t::get_ymin, py::return_value_policy::copy)
+        .def("get_ymax", &detection_t::get_ymax, py::return_value_policy::copy)
+        .def("get_depth_x", &detection_t::get_depth_x, py::return_value_policy::copy)
+        .def("get_depth_y", &detection_t::get_depth_y, py::return_value_policy::copy)
+        .def("get_depth_z", &detection_t::get_depth_z, py::return_value_policy::copy)
+
+        ;
 
     py::class_<HostPipeline>(m, "Pipeline")
         .def("get_available_data_packets", &HostPipeline::getAvailableDataPackets, py::return_value_policy::copy)
