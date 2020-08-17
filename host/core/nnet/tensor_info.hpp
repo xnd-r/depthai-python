@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 #include "cnn_info.hpp"
-
+#include "../../shared/json_helper.hpp"
 #include "../types.hpp"
 
 
@@ -16,30 +16,24 @@ struct TensorInfo
 {
     TensorInfo() = delete;
 
-    TensorInfo(Tensor_info ti)
+    TensorInfo(nlohmann::json tensor_info)
     {
-        tensor_name = std::string(ti.name);
+        tensor_name = tensor_info["name"];
 
-        output_data_type = ti.shape.dataType;
-        tensor_offset = ti.offset;
-        tensor_idx = ti.idx;
-        tensor_size = size_of_type(output_data_type);
-        for(int i = 0; i < ti.shape.numDims; i ++)
-        {
-            tensor_dimensions.push_back(ti.shape.dims[i]);
-            tensor_size *= ti.shape.dims[i];
-        }
+        tensor_data_type = tensor_info["shape"]["data_type"];
+        tensor_offset = tensor_info["offset"];
+        tensor_idx = tensor_info["idx"];
+        tensor_size = size_of_type(tensor_data_type);
+        tensor_dimensions = tensor_info["shape"]["dimensions"].get<std::vector<int32_t>>();
+        tensor_strides    = tensor_info["shape"]["strides"].get<std::vector<int32_t>>();;
     }
 
     std::string tensor_name;
-    std::vector<int> tensor_dimensions;
-    TensorDataType output_data_type = TensorDataType::UNDEFINED;
+    std::vector<int32_t> tensor_dimensions;
+    std::vector<int32_t> tensor_strides;
+
+    TensorDataType tensor_data_type;
     size_t tensor_offset;
     size_t tensor_size;
     size_t tensor_idx;
-
-    int nnet_input_width  = 0;
-    int nnet_input_height = 0;
-
-
 };

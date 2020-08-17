@@ -25,7 +25,7 @@ template <>
 
 const std::map<TensorDataType, unsigned int> c_type_size = {
     {TensorDataType::_fp16,     sizeof(float16)},
-    {TensorDataType::_u8f,      sizeof(std::int8_t)},
+    {TensorDataType::_u8f,      sizeof(std::uint8_t)},
     {TensorDataType::_int,      sizeof(std::int32_t)},
     {TensorDataType::_fp32,     sizeof(float)},
     {TensorDataType::_i8,       sizeof(std::int8_t)},
@@ -33,7 +33,7 @@ const std::map<TensorDataType, unsigned int> c_type_size = {
 
 const std::map<TensorDataType, std::string> type_to_numpy_format = {
     {TensorDataType::_fp16,     pybind11::format_descriptor<float16>::format()},
-    {TensorDataType::_u8f,      pybind11::format_descriptor<std::int8_t>::format()},
+    {TensorDataType::_u8f,      pybind11::format_descriptor<std::uint8_t>::format()},
     {TensorDataType::_int,      pybind11::format_descriptor<std::int32_t>::format()},
     {TensorDataType::_fp32,     pybind11::format_descriptor<float>::format()},
     {TensorDataType::_i8,       pybind11::format_descriptor<std::int8_t>::format()},
@@ -41,7 +41,7 @@ const std::map<TensorDataType, std::string> type_to_numpy_format = {
 
 const std::map<TensorDataType, std::string> type_to_string = {
     {TensorDataType::_fp16,     "float16"},
-    {TensorDataType::_u8f,      "float8"},
+    {TensorDataType::_u8f,      "uint8"},
     {TensorDataType::_int,      "int32"},
     {TensorDataType::_fp32,     "float32"},
     {TensorDataType::_i8,       "int8"},

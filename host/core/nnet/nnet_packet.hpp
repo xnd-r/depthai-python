@@ -42,18 +42,17 @@ public:
         py::array* result = nullptr;
 
         ssize_t              ndim    = ti.tensor_dimensions.size();
-        ssize_t              element_size = size_of_type(ti.output_data_type);
-        std::string          numpy_format_descriptor = type_to_npy_format_descriptor(ti.output_data_type);
+        ssize_t              element_size = size_of_type(ti.tensor_data_type);
+        std::string          numpy_format_descriptor = type_to_npy_format_descriptor(ti.tensor_data_type);
         std::vector<ssize_t> shape;
         std::vector<ssize_t> strides;
+        shape.reserve(ndim);
+        strides.reserve(ndim);
 
-        auto size_div = std::accumulate(std::begin(ti.tensor_dimensions), std::end(ti.tensor_dimensions), 1, std::multiplies<int>());
-        for (int i = 0; i < ti.tensor_dimensions.size(); ++i)
+        for (int i = 0; i < ndim; ++i)
         {
             shape.push_back(ti.tensor_dimensions[i]);
-
-            size_div /= ti.tensor_dimensions[i];
-            strides.push_back(size_div*element_size);
+            strides.push_back(ti.tensor_strides[i]);
         }
 
         try {

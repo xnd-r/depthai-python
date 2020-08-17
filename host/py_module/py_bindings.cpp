@@ -390,7 +390,7 @@ std::shared_ptr<CNNHostPipeline> create_pipeline(
         int num_stages = config.ai.blob_file2.empty() ? 1 : 2;
 
         // read tensor info
-        std::vector<TensorInfo>       tensors_info;
+        std::vector<TensorInfo>       tensors_info_output, tensors_info_input;
         std::cout << config.ai.blob_file_config << std::endl;
         std::ifstream jsonFile(config.ai.blob_file_config);
         nlohmann::json json_NN_ = nlohmann::json::parse(jsonFile);
@@ -631,107 +631,85 @@ std::shared_ptr<CNNHostPipeline> create_pipeline(
                 printf("depthai: done sending Blob file %s\n", blob_file[stage].c_str());
 
                 // outBlob
-                StreamInfo outBlob;
-                outBlob.name = "outBlob";
-                //TODO: remove asserts considering StreamInfo size
-                outBlob.size = 1;
+                StreamInfo outBlob("outBlob", 102400);
+                                
+               
+                std::string blob_info_str;
 
-                cnn_info cnn_input_info = {};
-                cnn_tensor_infos tensor_infos;
-                
-
-                g_xlink->openReadAndCloseStream(
+                int out_blob_length = g_xlink->openReadAndCloseStream(
                     outBlob,
-                    (void*)&tensor_infos,
-                    sizeof(tensor_infos)
+                    blob_info_str
                     );
+                if(out_blob_length == -1)
+                {
+                    break;
+                }
+                nlohmann::json blob_info;
+                if (!getJSONFromString(blob_info_str, blob_info))
+                {
+                    std::cout << "depthai: error parsing blob_info\n";
+                    break;
+                }
+                // std::cout << blob_info << std::endl;
 
-                printf("input \n");
-                for(int _i = 0; _i < tensor_infos.input_size; _i++)
+                std::vector<nlohmann::json> input_layers = blob_info["input_layers"].get<std::vector<nlohmann::json>>();
+                std::vector<nlohmann::json> output_layers = blob_info["output_layers"].get<std::vector<nlohmann::json>>();
+
+                for(auto input_json : input_layers)
                 {
-                    printf("idx %d \n", (int)tensor_infos.input_info[_i].idx);
-                    printf("offset %d \n", (int)tensor_infos.input_info[_i].offset);
-                    printf("name %s \n", tensor_infos.input_info[_i].name);
-                    printf("dataType %d \n", (int)tensor_infos.input_info[_i].shape.dataType);
-                    printf("numDims %d \n", (int)tensor_infos.input_info[_i].shape.numDims);
-                    printf("dims \n");
-                    for (int i = 0; i < (int)tensor_infos.input_info[_i].shape.numDims; i++)
-                    {
-                        printf("%d ", (int)tensor_infos.input_info[_i].shape.dims[i]);
-                    }
-                    printf("\n\n");
+                    std::cout << input_json << std::endl;
+                    TensorInfo _tensors_info_input(input_json);
+                    tensors_info_input.push_back(_tensors_info_input);
                 }
-                printf("output \n");
-                for(int _i = 0; _i < tensor_infos.output_size; _i++)
+
+                for(auto output_json : output_layers)
                 {
-                    TensorInfo t_info(tensor_infos.output_info[_i]);
-                    tensors_info.push_back(t_info);
-                    printf("idx %d \n", (int)tensor_infos.output_info[_i].idx);
-                    printf("offset %d \n", (int)tensor_infos.output_info[_i].offset);
-                    printf("name %s \n", tensor_infos.output_info[_i].name);
-                    printf("dataType %d \n", (int)tensor_infos.output_info[_i].shape.dataType);
-                    printf("numDims %d \n", (int)tensor_infos.output_info[_i].shape.numDims);
-                    printf("dims \n");
-                    for (int i = 0; i < (int)tensor_infos.output_info[_i].shape.numDims; i++)
-                    {
-                        printf("%d ", (int)tensor_infos.output_info[_i].shape.dims[i]);
-                    }
-                    printf("\n\n");
+                    std::cout << output_json << std::endl;
+                    TensorInfo _tensors_info_output(output_json);
+                    tensors_info_output.push_back(_tensors_info_output);
                 }
-                
-                cnn_input_info.cnn_input_width = tensor_infos.input_info[0].shape.dims[tensor_infos.input_info[0].shape.numDims-1];
-                cnn_input_info.cnn_input_height = tensor_infos.input_info[0].shape.dims[tensor_infos.input_info[0].shape.numDims-2];
-                cnn_input_info.cnn_input_num_channels = tensor_infos.input_info[0].shape.dims[tensor_infos.input_info[0].shape.numDims-3];
-                cnn_input_info.satisfied_resources = tensor_infos.satisfied_resources;
-                cnn_input_info.nn_to_depth = tensor_infos.nn_to_depth;
-                
-                printf("CNN input width: %d\n", cnn_input_info.cnn_input_width);
-                printf("CNN input height: %d\n", cnn_input_info.cnn_input_height);
-                printf("CNN input num channels: %d\n", cnn_input_info.cnn_input_num_channels);
+
+                int satisfied_resources = blob_info["metadata"]["satisfied_resources"];
+                int number_of_shaves = blob_info["metadata"]["number_of_shaves"];
+                int number_of_cmx_slices = blob_info["metadata"]["number_of_cmx_slices"];
+
                 if (stage == 0)
                 {
+                    nn_to_depth_mapping["off_x"] = blob_info["metadata"]["nn_to_depth"]["offset_x"];
+                    nn_to_depth_mapping["off_y"] = blob_info["metadata"]["nn_to_depth"]["offset_y"];
+                    nn_to_depth_mapping["max_w"] = blob_info["metadata"]["nn_to_depth"]["max_width"];
+                    nn_to_depth_mapping["max_h"] = blob_info["metadata"]["nn_to_depth"]["max_height"];
                     printf("CNN to depth bounding-box mapping: start(%d, %d), max_size(%d, %d)\n",
-                            cnn_input_info.nn_to_depth.offset_x,
-                            cnn_input_info.nn_to_depth.offset_y,
-                            cnn_input_info.nn_to_depth.max_width,
-                            cnn_input_info.nn_to_depth.max_height);
-                    nn_to_depth_mapping["off_x"] = cnn_input_info.nn_to_depth.offset_x;
-                    nn_to_depth_mapping["off_y"] = cnn_input_info.nn_to_depth.offset_y;
-                    nn_to_depth_mapping["max_w"] = cnn_input_info.nn_to_depth.max_width;
-                    nn_to_depth_mapping["max_h"] = cnn_input_info.nn_to_depth.max_height;
+                            nn_to_depth_mapping["off_x"],
+                            nn_to_depth_mapping["off_y"],
+                            nn_to_depth_mapping["max_w"],
+                            nn_to_depth_mapping["max_h"]);
                 }
-                // update tensor infos
-                // assert(!(tensors_info.size() > (sizeof(cnn_input_info.offsets)/sizeof(cnn_input_info.offsets[0]))));
 
                 if (stage == 0) {
-                    for (int i = 0; i < tensors_info.size(); i++)
-                    {
-                        tensors_info[i].nnet_input_width  = cnn_input_info.cnn_input_width;
-                        tensors_info[i].nnet_input_height = cnn_input_info.cnn_input_height;
-                    }
-
+     
                     c_streams_myriad_to_pc["previewout"].dimensions = {
-                                                                       cnn_input_info.cnn_input_num_channels,
-                                                                       cnn_input_info.cnn_input_height,
-                                                                       cnn_input_info.cnn_input_width
+                                                                       tensors_info_input[0].tensor_dimensions[tensors_info_input[0].tensor_dimensions.size()-3],
+                                                                       tensors_info_input[0].tensor_dimensions[tensors_info_input[0].tensor_dimensions.size()-2],
+                                                                       tensors_info_input[0].tensor_dimensions[tensors_info_input[0].tensor_dimensions.size()-1],
                                                                        };
                 }
                 // check CMX slices & used shaves
-                if (cnn_input_info.number_of_cmx_slices > config.ai.cmx_slices)
+                if (number_of_cmx_slices > config.ai.cmx_slices)
                 {
-                    std::cerr << WARNING "Error: Blob is compiled for " << cnn_input_info.number_of_cmx_slices
+                    std::cerr << WARNING "Error: Blob is compiled for " << number_of_cmx_slices
                               << " cmx slices but device is configured to calculate on " << config.ai.cmx_slices << "\n" ENDC;
                     break;
                 }
 
-                if (cnn_input_info.number_of_shaves > config.ai.shaves)
+                if (number_of_shaves > config.ai.shaves)
                 {
-                    std::cerr << WARNING "Error: Blob is compiled for " << cnn_input_info.number_of_shaves
+                    std::cerr << WARNING "Error: Blob is compiled for " << number_of_shaves
                               << " shaves but device is configured to calculate on " << config.ai.shaves << "\n" ENDC;
                     break;
                 }
 
-                if(!cnn_input_info.satisfied_resources)
+                if(!satisfied_resources)
                 {
                     std::cerr << WARNING "ERROR: requested CNN resources overlaps with RGB camera \n" ENDC;
                     return nullptr;
@@ -780,7 +758,7 @@ std::shared_ptr<CNNHostPipeline> create_pipeline(
 
         // pipeline
         if(gl_result == nullptr)
-            gl_result = std::shared_ptr<CNNHostPipeline>(new CNNHostPipeline(tensors_info));
+            gl_result = std::shared_ptr<CNNHostPipeline>(new CNNHostPipeline(tensors_info_input, tensors_info_output));
 
         for (const std::string &stream_name : pipeline_device_streams)
         {
@@ -1027,7 +1005,7 @@ PYBIND11_MODULE(depthai, m)
 
     py::class_<detection_t>(m, "Detection")
         .def_readonly("label", &detection_t::label)
-        .def_readonly("score", &detection_t::score)
+        .def_readonly("confidence", &detection_t::confidence)
         .def_readonly("x_min", &detection_t::x_min)
         .def_readonly("y_min", &detection_t::y_min)
         .def_readonly("x_max", &detection_t::x_max)
@@ -1038,7 +1016,7 @@ PYBIND11_MODULE(depthai, m)
         .def("get_dict", []() {
                 py::dict d;
                 d["label"] = &detection_t::label;
-                d["score"] = &detection_t::score;
+                d["confidence"] = &detection_t::confidence;
                 d["x_min"] = &detection_t::x_min;
                 d["y_min"] = &detection_t::y_min;
                 d["x_max"] = &detection_t::x_max;
