@@ -17,7 +17,6 @@
 #include "../core/host_data_packet.hpp"
 #include "../core/host_data_reader.hpp"
 #include "../core/nnet/tensor_info.hpp"
-#include "../core/nnet/tensor_info_helper.hpp"
 #include "../core/nnet/nnet_packet.hpp"
 #include "../core/pipeline/host_pipeline.hpp"
 #include "../core/pipeline/host_pipeline_config.hpp"
@@ -867,6 +866,8 @@ PYBIND11_MODULE(depthai, m)
 {
     init_binding_capture_af(m);
 
+    // PYBIND11_NUMPY_DTYPE(detection_t, label, score, x_min, y_min, x_max, y_max, depth_x, depth_y, depth_z );
+
     m.def(
         "send_DisparityConfidenceThreshold",
         &send_DisparityConfidenceThreshold,
@@ -1017,23 +1018,36 @@ PYBIND11_MODULE(depthai, m)
         .def("get_tensor", &NNetPacket::getTensor, py::return_value_policy::copy)
         .def("get_tensor", &NNetPacket::getTensorByName, py::return_value_policy::copy)
         .def("getMetadata", &NNetPacket::getMetadata, py::return_value_policy::copy)
-        .def("getOutputs", &NNetPacket::getOutputs, py::return_value_policy::copy)     
+        .def("getOutputsList", &NNetPacket::getOutputsList, py::return_value_policy::copy)     
+        .def("getOutputsDict", &NNetPacket::getOutputsDict, py::return_value_policy::copy)     
         .def("getTensorsSize", &NNetPacket::getTensorsSize, py::return_value_policy::copy)     
         .def("getDetectionCount", &NNetPacket::getDetectionCount, py::return_value_policy::copy)
-        .def("getDetectedObject", &NNetPacket::getDetectedObject, py::return_value_policy::copy)       
+        .def("getDetectedObject", &NNetPacket::getDetectedObject, py::return_value_policy::copy)
         ;
 
     py::class_<detection_t>(m, "Detection")
-        .def("get_label_id", &detection_t::get_label_id, py::return_value_policy::copy)
-        .def("get_score", &detection_t::get_score, py::return_value_policy::copy)
-        .def("get_xmin", &detection_t::get_xmin, py::return_value_policy::copy)
-        .def("get_xmax", &detection_t::get_xmax, py::return_value_policy::copy)
-        .def("get_ymin", &detection_t::get_ymin, py::return_value_policy::copy)
-        .def("get_ymax", &detection_t::get_ymax, py::return_value_policy::copy)
-        .def("get_depth_x", &detection_t::get_depth_x, py::return_value_policy::copy)
-        .def("get_depth_y", &detection_t::get_depth_y, py::return_value_policy::copy)
-        .def("get_depth_z", &detection_t::get_depth_z, py::return_value_policy::copy)
-
+        .def_readonly("label", &detection_t::label)
+        .def_readonly("score", &detection_t::score)
+        .def_readonly("x_min", &detection_t::x_min)
+        .def_readonly("y_min", &detection_t::y_min)
+        .def_readonly("x_max", &detection_t::x_max)
+        .def_readonly("y_max", &detection_t::y_max)
+        .def_readonly("depth_x", &detection_t::depth_x)
+        .def_readonly("depth_y", &detection_t::depth_y)
+        .def_readonly("depth_z", &detection_t::depth_z)
+        .def("get_dict", []() {
+                py::dict d;
+                d["label"] = &detection_t::label;
+                d["score"] = &detection_t::score;
+                d["x_min"] = &detection_t::x_min;
+                d["y_min"] = &detection_t::y_min;
+                d["x_max"] = &detection_t::x_max;
+                d["y_max"] = &detection_t::y_max;
+                d["depth_x"] = &detection_t::depth_x;
+                d["depth_y"] = &detection_t::depth_y;
+                d["depth_z"] = &detection_t::depth_z;
+                return d;
+            })
         ;
 
     py::class_<HostPipeline>(m, "Pipeline")

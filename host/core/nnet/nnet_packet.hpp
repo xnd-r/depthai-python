@@ -10,6 +10,10 @@
 #include "../host_data_packet.hpp"
 #include "cnn_info.hpp"
 
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+#include "types.hpp"
+
 class NNetPacket
 {
 public:
@@ -32,13 +36,14 @@ public:
     }
 
 #ifdef HOST_PYTHON_MODULE
-    py::array* _getPythonNumpyArray(unsigned char *data, TensorInfo ti)
+    py::array* _getTensorPythonNumpyArray(unsigned char *data, TensorInfo ti)
     {
         assert(!ti.tensor_dimensions.empty());
         py::array* result = nullptr;
 
         ssize_t              ndim    = ti.tensor_dimensions.size();
         ssize_t              element_size = size_of_type(ti.output_data_type);
+        std::string          numpy_format_descriptor = type_to_npy_format_descriptor(ti.output_data_type);
         std::vector<ssize_t> shape;
         std::vector<ssize_t> strides;
 
@@ -56,7 +61,7 @@ public:
             result = new py::array(py::buffer_info(
                         static_cast<void*>(&data[ti.tensor_offset]),                             /* data as contiguous array  */
                         element_size,                          /* size of one scalar        */
-                        py::format_descriptor<std::uint16_t>::format(),         /* data type          */
+                        numpy_format_descriptor,         /* data type          */
                         ndim, //ndim,                                    /* number of dimensions      */
                         shape, //shape,                                   /* shape of the matrix       */
                         strides //strides                                  /* strides for each axis     */
@@ -75,7 +80,7 @@ public:
         assert(index < _tensors_info.size());
         TensorInfo ti = _tensors_info[index];
         unsigned char * data = _tensors_raw_data->data.data();
-        return _getPythonNumpyArray(data, ti);
+        return _getTensorPythonNumpyArray(data, ti);
     }
 
     py::array* getTensorByName(const std::string &name)
@@ -96,7 +101,17 @@ public:
         return _tensors_raw_data->getMetadata();
     }
 
-    py::dict getOutputs() {
+    py::list getOutputsList() {
+        py::list outputList;
+        for (size_t i = 0; i < _tensors_info.size(); ++i)
+        {
+            outputList.append(getTensor(i));
+        }
+        return outputList;
+    }
+
+
+    py::dict getOutputsDict() {
         py::dict outputs;
         for (size_t i = 0; i < _tensors_info.size(); ++i)
         {

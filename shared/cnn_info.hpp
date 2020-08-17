@@ -14,42 +14,6 @@ struct detection_t
     float depth_x;
     float depth_y;
     float depth_z;
-
-    uint32_t get_label_id(void){
-        return label;
-    }
-
-    float get_score(void){
-        return score;
-    }
-
-    float get_xmin(void){
-        return x_min;
-    }
-    
-    float get_xmax(void){
-        return x_max;
-    }
-
-    float get_ymin(void){
-        return y_min;
-    }
-
-    float get_ymax(void){
-        return y_max;
-    }
-
-    float get_depth_x(void){
-        return depth_x;
-    }
-
-    float get_depth_y(void){
-        return depth_y;
-    }
-
-    float get_depth_z(void){
-        return depth_z;
-    }
 };
 
 struct detection_out_t
@@ -79,8 +43,9 @@ struct cnn_info
 };
 
 
-typedef enum TensorDataType : uint32_t
+typedef enum TensorDataType : int32_t
 {
+    UNDEFINED = -1,
     _fp16 = 0,                  ///< Half precision floating point
     _u8f  = 1,                  ///< Unsigned byte
     _int  = 2,                  ///< Signed integer (4 byte)

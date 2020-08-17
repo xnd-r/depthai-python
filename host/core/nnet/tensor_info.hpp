@@ -20,7 +20,7 @@ struct TensorInfo
     {
         tensor_name = std::string(ti.name);
 
-        // output_data_type = ti.shape.dataType;
+        output_data_type = ti.shape.dataType;
         tensor_offset = ti.offset;
         tensor_idx = ti.idx;
         tensor_size = size_of_type(output_data_type);
@@ -33,7 +33,7 @@ struct TensorInfo
 
     std::string tensor_name;
     std::vector<int> tensor_dimensions;
-    Type output_data_type = Type::F16;
+    TensorDataType output_data_type = TensorDataType::UNDEFINED;
     size_t tensor_offset;
     size_t tensor_size;
     size_t tensor_idx;
@@ -41,8 +41,5 @@ struct TensorInfo
     int nnet_input_width  = 0;
     int nnet_input_height = 0;
 
-
-    std::vector<std::vector<std::string>>                               output_property_key_index_to_string;
-    std::vector<std::unordered_map<std::string, unsigned>>              output_property_key_string_to_index;
 
 };
