@@ -30,6 +30,7 @@
 #include "../../shared/json_helper.hpp"
 #include "../../shared/version.hpp"
 #include "../../shared/xlink/xlink_wrapper.hpp"
+#include "../../shared/fw_update/fw_update.h"
 #include "../core/host_json_helper.hpp"
 #include "host_capture_command.hpp"
 #include "model_downloader.hpp"
@@ -193,6 +194,21 @@ bool init_device(
         }
 
         g_xlink = std::unique_ptr<XLinkWrapper>(new XLinkWrapper(true));
+
+
+        if (usb_device == "no_device") {
+            printf("%s: Skipping connection to device!\n", __func__);
+            // Fixed device config
+            g_config_d2h = {
+                    {"_cams", {
+                        {"rgb", true},
+                        {"left", true},
+                        {"right", true},
+                    }},
+                    //{"_version", "<no-device>"},
+            };
+            return true;
+        }
 
         if (!g_xlink->initFromHostSide(
                 &g_xlink_global_handler,
@@ -597,6 +613,50 @@ std::shared_ptr<CNNHostPipeline> create_pipeline(
         // host -> "config_h2d" -> device
         std::string pipeline_config_str_packed = json_config_obj.dump();
         std::cout << "config_h2d json:\n" << pipeline_config_str_packed << "\n";
+
+        if (usb_device_backup == "no_device") {
+            const char *fname = "depthai_flash.fw";
+            printf("Creating flash package...\n");
+            auto f = std::fstream(fname, std::ios::out | std::ios::binary);
+
+            char header[] = FW_FILE_HEADER;
+            uint32_t version = FW_FORMAT_VERSION;
+            f.write(header, sizeof header);
+            f.write((char*)&version, sizeof version);
+
+            printf(" - adding firmware: %s\n", cmd_backup.c_str());
+            HostDataReader file_reader;
+            file_reader.init(cmd_backup);
+            fw_entry_header h;
+            h.type = FW_DEVICE_APP;
+            h.size = file_reader.getSize();
+            std::vector<uint8_t> fw_buff(h.size);
+            file_reader.readData(fw_buff.data(), h.size);
+            f.write((char*)&h, sizeof h);
+            f.write((char*)fw_buff.data(), h.size);
+
+            printf(" - adding json config (config_h2d printed above)\n");
+            h.type = FW_CONFIG;
+            h.size = pipeline_config_str_packed.size() + 1 /* null terminator */;
+            f.write((char*)&h, sizeof h);
+            f.write(pipeline_config_str_packed.c_str(), h.size);
+
+            h.type = FW_NN_BLOB;
+            for (int stage = 0; stage < num_stages; stage++) {
+                printf(" - adding NN blob: %s\n", blob_file[stage].c_str());
+                h.size = size_blob[stage];
+                std::vector<uint8_t> buff_blob(h.size);
+                _blob_reader[stage].readData(buff_blob.data(), h.size);
+                f.write((char*)&h, sizeof h);
+                f.write((char*)buff_blob.data(), h.size);
+            }
+
+            f.close();
+            printf("\nNow please flash via USB (DFU protocol):\n");
+            printf("dfu-util -D %s\n", fname);
+            exit(0);
+        }
+
         // resize, as xlink expects exact;y the same size for input:
         assert(pipeline_config_str_packed.size() < g_streams_pc_to_myriad.at("config_h2d").size);
         pipeline_config_str_packed.resize(g_streams_pc_to_myriad.at("config_h2d").size, 0);
