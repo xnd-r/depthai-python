@@ -146,6 +146,12 @@ bool XLinkWrapper::initFromHostSide(
                 printf("Failed to boot the device: %s, err code %d\n", deviceDesc.name, rc);
                 break;
             }
+            if (device_cmd_file == "loader.cmd") {
+                printf("\nBootloader FW %s booted over USB, exposing a new USB DFU interface.\n", device_cmd_file.c_str());
+                printf("Now please write it into the SPI Flash by running (it will take several seconds):\n");
+                printf("    dfu-util -D %s\n", device_cmd_file.c_str());
+                exit(0);
+            }
         } else {
             // Development option, the firmware is loaded via JTAG
             printf("Device boot is skipped. (\"cmd_file\" NOT SPECIFIED !)\n");
