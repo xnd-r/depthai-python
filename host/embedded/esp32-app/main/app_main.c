@@ -52,7 +52,10 @@ task waits for this semaphore to be given before queueing a transmission.
 /*
 Pins in use. The SPI Master can use the GPIO mux, so feel free to change these if needed.
 */
-#define GPIO_HANDSHAKE 2
+
+// DepthAI uses SPI2.6 pin as an interrupt output, open-drain, active low.
+#define GPIO_HANDSHAKE 2 // ESP32 pin that connects to SPI2.6
+
 #if 0 // original config in esp-idf example
 #define GPIO_MOSI 12
 #define GPIO_MISO 13
@@ -65,11 +68,13 @@ Pins in use. The SPI Master can use the GPIO mux, so feel free to change these i
 #define GPIO_CS 15
 #endif
 
+#define SPI_PKT_SIZE 256
+
 //The semaphore indicating the slave is ready to receive stuff.
 static xQueueHandle rdySem;
 
 /*
-This ISR is called when the handshake line goes high.
+This ISR is called when the handshake line goes low.
 */
 static void IRAM_ATTR gpio_handshake_isr_handler(void* arg)
 {
@@ -117,15 +122,15 @@ void app_main()
 
     //GPIO config for the handshake line.
     gpio_config_t io_conf={
-        .intr_type=GPIO_PIN_INTR_POSEDGE,
+        .intr_type=GPIO_PIN_INTR_NEGEDGE,
         .mode=GPIO_MODE_INPUT,
         .pull_up_en=1,
         .pin_bit_mask=(1<<GPIO_HANDSHAKE)
     };
 
     int n=0;
-    static char sendbuf[256] = {0};
-    static char recvbuf[256] = {0};
+    static char sendbuf[SPI_PKT_SIZE] = {0};
+    static char recvbuf[SPI_PKT_SIZE+1] = {0}; // +1 for extra null terminator
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
 
@@ -135,7 +140,7 @@ void app_main()
     //Set up handshake line interrupt.
     gpio_config(&io_conf);
     gpio_install_isr_service(0);
-    gpio_set_intr_type(GPIO_HANDSHAKE, GPIO_PIN_INTR_POSEDGE);
+    gpio_set_intr_type(GPIO_HANDSHAKE, GPIO_PIN_INTR_NEGEDGE);
     gpio_isr_handler_add(GPIO_HANDSHAKE, gpio_handshake_isr_handler, NULL);
 
     //Initialize the SPI bus and add the device we want to send stuff to.
@@ -157,13 +162,32 @@ void app_main()
         t.tx_buffer=sendbuf;
         t.rx_buffer=recvbuf;
         //Wait for slave to be ready for next byte before sending
-#if 0 // TODO: implement an interrupt GPIO output from DepthAI
+#if 1 // Interrupt based
         xSemaphoreTake(rdySem, portMAX_DELAY); //Wait until slave is ready
-#else
+#else // Polling / fixed wait before transfers, should still work, but no longer recommended
         vTaskDelay(30 / portTICK_PERIOD_MS);
 #endif
         ret=spi_device_transmit(handle, &t);
-        printf("[RECV-%d] %s\n", n, recvbuf);
+
+        int index = 0;
+        if (1) {
+            // Sometimes it may happen that zero bytes are inserted at the beginning
+            // of the received data, if the controller (ESP32) starts the transfer
+            // before DepthAI prepared the buffers.
+            // Workaround to try recovering the packet, by skipping zero bytes
+            for (index = 0; index < SPI_PKT_SIZE; index++)
+                if (recvbuf[index] != 0)
+                    break;
+        }
+        char *spi_message = recvbuf + index;
+
+        printf("[RECV-%d]", n);
+        if (index == SPI_PKT_SIZE)
+            printf(" (full-zero packet)");
+        else if (index > 0)
+            printf(" (skipped %d zero bytes)", index);
+        printf(" %s\n", spi_message);
+
         n++;
     }
 
