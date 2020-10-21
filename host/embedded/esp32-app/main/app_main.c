@@ -53,6 +53,12 @@ task waits for this semaphore to be given before queueing a transmission.
 Pins in use. The SPI Master can use the GPIO mux, so feel free to change these if needed.
 */
 
+// This pin is used on BW1092. On BW1098EMB it should connect to SPI2.5
+// Assert low to put DepthAI bootloader in DFU update mode.
+#define GPIO_UPDATE_DEPTHAI_FW 4
+// Set to 1 only when updating DepthAI firmware, then reset to 0
+#define ENABLE_FW_UPDATE 0
+
 // DepthAI uses SPI2.6 pin as an interrupt output, open-drain, active low.
 #define GPIO_HANDSHAKE 2 // ESP32 pin that connects to SPI2.6
 
@@ -95,6 +101,12 @@ static void IRAM_ATTR gpio_handshake_isr_handler(void* arg)
 //Main application
 void app_main()
 {
+    if (ENABLE_FW_UPDATE) {
+        gpio_reset_pin    (GPIO_UPDATE_DEPTHAI_FW);
+        gpio_set_direction(GPIO_UPDATE_DEPTHAI_FW, GPIO_MODE_OUTPUT);
+        gpio_set_level    (GPIO_UPDATE_DEPTHAI_FW, 0);
+    }
+
     esp_err_t ret;
     spi_device_handle_t handle;
 
