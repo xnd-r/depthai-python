@@ -200,6 +200,40 @@ void app_main()
             printf(" (skipped %d zero bytes)", index);
         printf(" %s\n", spi_message);
 
+        // Parse SPI message string
+        #define MAX_DETECTIONS 3
+        int seq_num = -1;
+        int num_detections = 0;
+        static struct {
+            int label;
+            float score, x0, y0, x1, y1, dist_x, dist_y, dist_z;
+        } det[MAX_DETECTIONS];
+        char *current = spi_message;
+        do {
+            int bytes = 0;
+            int elements = sscanf(current, "DepthAI %d\n%n", &seq_num, &bytes);
+            if (seq_num < 0) break;
+            for (int i = 0; i < MAX_DETECTIONS; i++) {
+                int index = -1;
+                current += bytes;
+                elements = sscanf(current, "%d lbl %d %f%% xy0xy1 %f%f%f%f xyz %f%f%f\n%n",
+                        &index, &det[i].label, &det[i].score,
+                        &det[i].x0, &det[i].y0, &det[i].x1, &det[i].y1,
+                        &det[i].dist_x, &det[i].dist_y, &det[i].dist_z, &bytes);
+                if (index != i) break;
+                if (elements <= 0) break;
+                num_detections++;
+            }
+        } while (0);
+
+        // Use parsed detections. Just print here for test
+        for (int i = 0; i < num_detections; i++) {
+            printf("[%d:%d] %2d %5.1f%% (%.3f,%.3f)->(%.3f,%.3f) %.2f %.2f %.2f\n",
+                    seq_num, i, det[i].label, det[i].score,
+                    det[i].x0, det[i].y0, det[i].x1, det[i].y1,
+                    det[i].dist_x, det[i].dist_y, det[i].dist_z);
+        }
+
         n++;
     }
 
