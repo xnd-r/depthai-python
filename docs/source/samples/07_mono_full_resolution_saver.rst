@@ -1,6 +1,8 @@
 07 - Mono Full Resolution Saver
 ===============================
 
+This example shows how to save 1280x720p .png of the left grayscale camera to disk. Left is defined as from the boards perspective.
+
 Demo
 ####
 
