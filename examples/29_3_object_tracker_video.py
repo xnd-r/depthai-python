@@ -40,7 +40,7 @@ manip.initialConfig.setResizeThumbnail(384, 384)
 # manip.initialConfig.setResize(384, 384)
 # manip.initialConfig.setKeepAspectRatio(False) #squash the image to not lose FOV
 # The NN model expects BGR input. By default ImageManip output type would be same as input (gray in this case)
-manip.initialConfig.setFrameType(dai.RawImgFrame.Type.BGR888p)
+manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
 xinFrame.out.link(manip.inputImage)
 manip.inputImage.setBlocking(True)
 
@@ -77,11 +77,8 @@ objectTracker.inputDetections.setBlocking(True)
 objectTracker.out.link(trackerOut.input)
 
 
-# Pipeline defined, now the device is connected to
+# Connect and start the pipeline
 with dai.Device(pipeline) as device:
-
-    # Start the pipeline
-    device.startPipeline()
 
     qIn = device.getInputQueue(name="inFrame")
     trackerFrameQ = device.getOutputQueue("trackerFrame", 4)
@@ -123,7 +120,7 @@ with dai.Device(pipeline) as device:
             break
 
         img = dai.ImgFrame()
-        img.setType(dai.RawImgFrame.Type.BGR888p)
+        img.setType(dai.ImgFrame.Type.BGR888p)
         img.setData(to_planar(frame, inputFrameShape))
         img.setTimestamp(baseTs)
         baseTs += 1/simulatedFps
