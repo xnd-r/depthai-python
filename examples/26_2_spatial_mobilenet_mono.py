@@ -19,7 +19,16 @@ labelMap = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus
             "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
 
 syncNN = True
-flipRectified = True
+showDisparity = 1  # Instead of passthrough depth (note: may not be properly synced)
+camRes = dai.MonoCameraProperties.SensorResolution.THE_800_P # THE_720_P THE_400_P
+nnFullCameraFov = 1
+lrCheck = 0  # Note: rectified is no longer mirrored if this is enabled, we need to fix it in FW
+extended = 0
+subpixel = 0  # Warning: if enabled, 3D position will be wrong, as disparity and depth can't work together
+disparityConfidenceThreshold = 230
+colorMap = cv2.COLORMAP_JET  # COLORMAP_HOT COLORMAP_TURBO
+
+flipRectified = False if lrCheck else True
 
 # Get argument first
 nnPath = str((Path(__file__).parent / Path('models/mobilenet-ssd_openvino_2021.2_6shave.blob')).resolve().absolute())
@@ -38,7 +47,7 @@ manip = pipeline.createImageManip()
 manip.initialConfig.setResize(300, 300)
 # The NN model expects BGR input. By default ImageManip output type would be same as input (gray in this case)
 manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-# manip.setKeepAspectRatio(False)
+manip.setKeepAspectRatio(not nnFullCameraFov)
 
 # Define a neural network that will make predictions based on the source frames
 spatialDetectionNetwork = pipeline.createMobileNetSpatialDetectionNetwork()
@@ -73,19 +82,29 @@ spatialDetectionNetwork.boundingBoxMapping.link(depthRoiMap.input)
 monoLeft = pipeline.createMonoCamera()
 monoRight = pipeline.createMonoCamera()
 stereo = pipeline.createStereoDepth()
-monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+monoLeft.setResolution(camRes)
 monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
-monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+monoRight.setResolution(camRes)
 monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
-stereo.setConfidenceThreshold(255)
+stereo.setLeftRightCheck(lrCheck)
+stereo.setExtendedDisparity(extended)
+stereo.setSubpixel(subpixel)
+stereo.setConfidenceThreshold(disparityConfidenceThreshold)
 
 stereo.rectifiedRight.link(manip.inputImage)
 
 monoLeft.out.link(stereo.left)
 monoRight.out.link(stereo.right)
 
-stereo.depth.link(spatialDetectionNetwork.inputDepth)
-spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
+if subpixel:
+    # This is wrong (computed X,Y,Z), but allows the depth view (disparity actually) to be correct
+    stereo.disparity.link(spatialDetectionNetwork.inputDepth)
+else:
+    stereo.depth.link(spatialDetectionNetwork.inputDepth)
+if showDisparity:
+    stereo.disparity.link(xoutDepth.input)
+else:
+    spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
 
 # Connect and start the pipeline
 with dai.Device(pipeline) as device:
@@ -120,9 +139,16 @@ with dai.Device(pipeline) as device:
 
         depthFrame = depth.getFrame()
 
-        depthFrameColor = cv2.normalize(depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
-        depthFrameColor = cv2.equalizeHist(depthFrameColor)
-        depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
+        if showDisparity:
+            depthFrameColor = cv2.normalize(depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
+            depthFrameColor = cv2.equalizeHist(depthFrameColor)
+            depthFrameColor = cv2.applyColorMap(depthFrameColor, colorMap)
+        else:
+            maxDisparity = 95
+            if extended: maxDisparity *= 2
+            if subpixel: maxDisparity *= 32
+            depthFrame = (depthFrame * 255. / maxDisparity).astype(np.uint8)
+            depthFrameColor = cv2.applyColorMap(depthFrame, colorMap)
         detections = det.detections
         if len(detections) != 0:
             boundingBoxMapping = depthRoiMap.get()
