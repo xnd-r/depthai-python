@@ -6,6 +6,8 @@ import cv2
 import depthai as dai
 import numpy as np
 import time
+import matplotlib.pyplot as plt
+import cmapy
 
 '''
 Mobilenet SSD device side decoding demo
@@ -26,7 +28,10 @@ lrCheck = 0  # Note: rectified is no longer mirrored if this is enabled, we need
 extended = 0
 subpixel = 0  # Warning: if enabled, 3D position will be wrong, as disparity and depth can't work together
 disparityConfidenceThreshold = 230
-colorMap = cv2.COLORMAP_JET  # COLORMAP_HOT COLORMAP_TURBO
+if 0:  # OpenCV predefined maps
+    colorMap = cv2.COLORMAP_JET  # COLORMAP_HOT, COLORMAP_TURBO, ...
+else:  # matplotlib maps, see: https://matplotlib.org/stable/tutorials/colors/colormaps.html
+    colorMap = cmapy.cmap('inferno')
 
 flipRectified = False if lrCheck else True
 
