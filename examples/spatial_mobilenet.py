@@ -11,6 +11,150 @@ import time
 Spatial detection network demo.
     Performs inference on RGB camera and retrieves spatial location coordinates: x,y,z relative to the center of depth map.
 '''
+class StereoConfigHandler:
+
+    class Trackbar:
+        def __init__(self, trackbarName, windowName, minValue, maxValue, defaultValue, handler):
+            self.min = minValue
+            self.max = maxValue
+            self.windowName = windowName
+            self.trackbarName = trackbarName
+            cv2.createTrackbar(trackbarName, windowName, minValue, maxValue, handler)
+            cv2.setTrackbarPos(trackbarName, windowName, defaultValue)
+
+        def set(self, value):
+            if value < self.min:
+                value = self.min
+                print(f'{self.trackbarName} min value is {self.min}')
+            if value > self.max:
+                value = self.max
+                print(f'{self.trackbarName} max value is {self.max}')
+            cv2.setTrackbarPos(self.trackbarName, self.windowName, value)
+
+    newConfig = False
+    config = None
+    trSigma = list()
+    trConfidence = list()
+    trLrCheck = list()
+    trFractionalBits = list()
+    trLineqAlpha = list()
+    trLineqBeta = list()
+    trLineqThreshold = list()
+
+    def trackbarSigma(value):
+        StereoConfigHandler.config.postProcessing.bilateralSigmaValue = value
+        StereoConfigHandler.newConfig = True
+        for tr in StereoConfigHandler.trSigma:
+            tr.set(value)
+
+    def trackbarConfidence(value):
+        StereoConfigHandler.config.costMatching.confidenceThreshold = value
+        StereoConfigHandler.newConfig = True
+        for tr in StereoConfigHandler.trConfidence:
+            tr.set(value)
+
+    def trackbarLrCheckThreshold(value):
+        StereoConfigHandler.config.algorithmControl.leftRightCheckThreshold = value
+        StereoConfigHandler.newConfig = True
+        for tr in StereoConfigHandler.trLrCheck:
+            tr.set(value)
+
+    def trackbarFractionalBits(value):
+        StereoConfigHandler.config.algorithmControl.subpixelFractionalBits = value
+        for tr in StereoConfigHandler.trFractionalBits:
+            tr.set(value)
+
+    def trackbarLineqAlpha(value):
+        StereoConfigHandler.config.costMatching.linearEquationParameters.alpha = value
+        StereoConfigHandler.newConfig = True
+        for tr in StereoConfigHandler.trLineqAlpha:
+            tr.set(value)
+
+    def trackbarLineqBeta(value):
+        StereoConfigHandler.config.costMatching.linearEquationParameters.beta = value
+        StereoConfigHandler.newConfig = True
+        for tr in StereoConfigHandler.trLineqBeta:
+            tr.set(value)
+
+    def trackbarLineqThreshold(value):
+        StereoConfigHandler.config.costMatching.linearEquationParameters.threshold = value
+        StereoConfigHandler.newConfig = True
+        for tr in StereoConfigHandler.trLineqThreshold:
+            tr.set(value)
+
+    def handleKeypress(key, stereoDepthConfigInQueue):
+        if key == ord('m'):
+            StereoConfigHandler.newConfig = True
+            medianSettings = [dai.MedianFilter.MEDIAN_OFF, dai.MedianFilter.KERNEL_3x3, dai.MedianFilter.KERNEL_5x5, dai.MedianFilter.KERNEL_7x7]
+            currentMedian = StereoConfigHandler.config.postProcessing.median
+            nextMedian = medianSettings[(medianSettings.index(currentMedian)+1) % len(medianSettings)]
+            print(f"Changing median to {nextMedian.name} from {currentMedian.name}")
+            StereoConfigHandler.config.postProcessing.median = nextMedian
+        elif key == ord('c'):
+            StereoConfigHandler.newConfig = True
+            censusSettings = [dai.RawStereoDepthConfig.CensusTransform.KernelSize.AUTO, dai.RawStereoDepthConfig.CensusTransform.KernelSize.KERNEL_5x5, dai.RawStereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x7, dai.RawStereoDepthConfig.CensusTransform.KernelSize.KERNEL_7x9]
+            currentCensus = StereoConfigHandler.config.censusTransform.kernelSize
+            nextCensus = censusSettings[(censusSettings.index(currentCensus)+1) % len(censusSettings)]
+            print(f"Changing census transform to {nextCensus.name} from {currentCensus.name}")
+            StereoConfigHandler.config.censusTransform.kernelSize = nextCensus
+        elif key == ord('d'):
+            StereoConfigHandler.newConfig = True
+            dispRangeSettings = [dai.RawStereoDepthConfig.CostMatching.DisparityWidth.DISPARITY_64, dai.RawStereoDepthConfig.CostMatching.DisparityWidth.DISPARITY_96]
+            currentDispRange = StereoConfigHandler.config.costMatching.disparityWidth
+            nextDispRange = dispRangeSettings[(dispRangeSettings.index(currentDispRange)+1) % len(dispRangeSettings)]
+            print(f"Changing disparity range to {nextDispRange.name} from {currentDispRange.name}")
+            StereoConfigHandler.config.costMatching.disparityWidth = nextDispRange
+        elif key == ord('f'):
+            StereoConfigHandler.newConfig = True
+            StereoConfigHandler.config.costMatching.enableCompanding = not StereoConfigHandler.config.costMatching.enableCompanding
+            state = "on" if StereoConfigHandler.config.costMatching.enableCompanding else "off"
+            print(f"Companding {state}")
+        elif key == ord('v'):
+            StereoConfigHandler.newConfig = True
+            StereoConfigHandler.config.censusTransform.enableMeanMode = not StereoConfigHandler.config.censusTransform.enableMeanMode
+            state = "on" if StereoConfigHandler.config.censusTransform.enableMeanMode else "off"
+            print(f"Census transform mean mode {state}")
+        elif key == ord('1'):
+            StereoConfigHandler.newConfig = True
+            StereoConfigHandler.config.algorithmControl.enableLeftRightCheck = not StereoConfigHandler.config.algorithmControl.enableLeftRightCheck
+            state = "on" if StereoConfigHandler.config.algorithmControl.enableLeftRightCheck else "off"
+            print(f"LR-check {state}")
+        elif key == ord('2'):
+            StereoConfigHandler.newConfig = True
+            StereoConfigHandler.config.algorithmControl.enableSubpixel = not StereoConfigHandler.config.algorithmControl.enableSubpixel
+            state = "on" if StereoConfigHandler.config.algorithmControl.enableSubpixel else "off"
+            print(f"Subpixel {state}")
+
+        StereoConfigHandler.sendConfig(stereoDepthConfigInQueue)
+
+    def sendConfig(stereoDepthConfigInQueue):
+        if StereoConfigHandler.newConfig:
+            StereoConfigHandler.newConfig = False
+            configMessage = dai.StereoDepthConfig()
+            configMessage.set(StereoConfigHandler.config)
+            stereoDepthConfigInQueue.send(configMessage)
+
+    def registerWindow(stream):
+        cv2.namedWindow(stream)
+        StereoConfigHandler.trConfidence.append(StereoConfigHandler.Trackbar('Disparity confidence', stream, 0, 255, StereoConfigHandler.config.costMatching.confidenceThreshold, StereoConfigHandler.trackbarConfidence))
+        StereoConfigHandler.trSigma.append(StereoConfigHandler.Trackbar('Bilateral sigma', stream, 0, 100, StereoConfigHandler.config.postProcessing.bilateralSigmaValue, StereoConfigHandler.trackbarSigma))
+        StereoConfigHandler.trLrCheck.append(StereoConfigHandler.Trackbar('LR-check threshold', stream, 0, 16, StereoConfigHandler.config.algorithmControl.leftRightCheckThreshold, StereoConfigHandler.trackbarLrCheckThreshold))
+        StereoConfigHandler.trFractionalBits.append(StereoConfigHandler.Trackbar('Subpixel fractional bits', stream, 3, 5, StereoConfigHandler.config.algorithmControl.subpixelFractionalBits, StereoConfigHandler.trackbarFractionalBits))
+        StereoConfigHandler.trLineqAlpha.append(StereoConfigHandler.Trackbar('Linear equation alpha', stream, 0, 15, StereoConfigHandler.config.costMatching.linearEquationParameters.alpha, StereoConfigHandler.trackbarLineqAlpha))
+        StereoConfigHandler.trLineqBeta.append(StereoConfigHandler.Trackbar('Linear equation beta', stream, 0, 15, StereoConfigHandler.config.costMatching.linearEquationParameters.beta, StereoConfigHandler.trackbarLineqBeta))
+        StereoConfigHandler.trLineqThreshold.append(StereoConfigHandler.Trackbar('Linear equation threshold', stream, 0, 255, StereoConfigHandler.config.costMatching.linearEquationParameters.threshold, StereoConfigHandler.trackbarLineqThreshold))
+
+    def __init__(self, config):
+        print("Control median filter using the 'm' key.")
+        print("Control census transform kernel size using the 'c' key.")
+        print("Control disparity search range using the 'd' key.")
+        print("Control disparity companding using the 'f' key.")
+        print("Control census transform mean mode using the 'v' key.")
+        print("Control left-right check mode using the '1' key.")
+        print("Control subpixel mode using the '2' key.")
+
+        StereoConfigHandler.config = config
+
 
 # Get argument first
 nnBlobPath = str((Path(__file__).parent / Path('models/mobilenet-ssd_openvino_2021.4_6shave.blob')).resolve().absolute())
@@ -47,6 +191,7 @@ xoutNN.setStreamName("detections")
 xoutBoundingBoxDepthMapping.setStreamName("boundingBoxDepthMapping")
 xoutDepth.setStreamName("depth")
 
+
 # Properties
 camRgb.setPreviewSize(300, 300)
 camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
@@ -58,8 +203,22 @@ monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
 monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
 monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
 
+camRgb.setFps(40)
+monoLeft.setFps(40)
+monoRight.setFps(40)
+
 # Setting node configs
 stereo.initialConfig.setConfidenceThreshold(255)
+stereo.setLeftRightCheck(False)
+stereo.setSubpixel(False)
+
+stereo.setRuntimeModeSwitch(True)
+xinStereoDepthConfig = pipeline.createXLinkIn()
+xinStereoDepthConfig.setStreamName("stereoDepthConfig")
+xinStereoDepthConfig.out.link(stereo.inputConfig)
+StereoConfigHandler(stereo.initialConfig.get())
+StereoConfigHandler.registerWindow('depth')
+
 
 spatialDetectionNetwork.setBlobPath(nnBlobPath)
 spatialDetectionNetwork.setConfidenceThreshold(0.5)
@@ -86,6 +245,8 @@ spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
 
 # Connect to device and start pipeline
 with dai.Device(pipeline) as device:
+
+    stereoDepthConfigInQueue = device.getInputQueue("stereoDepthConfig")
 
     # Output queues will be used to get the rgb frames and nn data from the outputs defined above
     previewQueue = device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
@@ -158,5 +319,8 @@ with dai.Device(pipeline) as device:
         cv2.imshow("depth", depthFrameColor)
         cv2.imshow("preview", frame)
 
-        if cv2.waitKey(1) == ord('q'):
+        key = cv2.waitKey(1)
+        if key == ord('q'):
             break
+
+        StereoConfigHandler.handleKeypress(key, stereoDepthConfigInQueue)
