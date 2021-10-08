@@ -68,13 +68,13 @@ stillMjpegOut.setStreamName('still')
 previewOut.setStreamName('preview')
 
 # Properties
-camRgb.setVideoSize(640, 360)
+#camRgb.setVideoSize(640, 480)
 camRgb.setPreviewSize(300, 300)
-videoEncoder.setDefaultProfilePreset(camRgb.getVideoSize(), camRgb.getFps(), dai.VideoEncoderProperties.Profile.MJPEG)
+camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_12_MP)
 stillEncoder.setDefaultProfilePreset(camRgb.getStillSize(), 1, dai.VideoEncoderProperties.Profile.MJPEG)
+stillEncoder.setQuality(100)
 
 # Linking
-camRgb.video.link(videoEncoder.input)
 camRgb.still.link(stillEncoder.input)
 camRgb.preview.link(previewOut.input)
 controlIn.out.link(camRgb.inputControl)
@@ -82,10 +82,11 @@ configIn.out.link(camRgb.inputConfig)
 videoEncoder.bitstream.link(videoMjpegOut.input)
 stillEncoder.bitstream.link(stillMjpegOut.input)
 if videoMjpeg:
-    colorCam.video.link(videoEncoder.input)
+    videoEncoder.setDefaultProfilePreset(camRgb.getVideoSize(), camRgb.getFps(), dai.VideoEncoderProperties.Profile.MJPEG)
+    camRgb.video.link(videoEncoder.input)
     videoEncoder.bitstream.link(videoMjpegOut.input)
 else:
-    colorCam.video.link(videoMjpegOut.input)
+    camRgb.video.link(videoMjpegOut.input)
 
 # Connect to device and start pipeline
 with dai.Device(pipeline) as device:
@@ -192,6 +193,9 @@ with dai.Device(pipeline) as device:
         for stillFrame in stillFrames:
             # Decode JPEG
             frame = cv2.imdecode(stillFrame.getData(), cv2.IMREAD_UNCHANGED)
+            fname = "capture.jpg"
+            stillFrame.getData().tofile(fname)
+            print("Saved to", fname)
             # Display
             cv2.imshow('still', frame)
 
