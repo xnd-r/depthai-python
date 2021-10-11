@@ -20,7 +20,7 @@ window.onload = function(){
   var desc_2 = document.createElement("a");
   main.className = "deprecation-msg"
   var url = window.location.toString();
-  var new_url = url.replace('/projects/api/en/docs_python_api/', '/projects/api/en/gen2_develop/');
+  var new_url = url.replace('/projects/api/en/docs_python_api/', '/projects/api/en/latest/');
   desc_2.href = new_url
   desc.appendChild(desc_2);
   var desc_2_text = document.createTextNode("latest version");
