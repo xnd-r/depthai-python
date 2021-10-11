@@ -1,15 +1,15 @@
-.depreciation-msg {
+.deprecation-msg {
     background-color: #c75f35;
     margin-top: 20px;
     padding: 10px;
 }
 
-.depreciation-msg-title {
+.deprecation-msg-title {
     margin: 0;
     font-weight: bold;
     font-size: 19px;
 }
-.depreciation-msg-desc a {
+.deprecation-msg-desc a {
     margin-left: 5px;
     color: #fcfcfc;
     text-decoration: underline;
