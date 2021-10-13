@@ -20,12 +20,23 @@ camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.RGB)
 # Linking
 camRgb.preview.link(xoutRgb.input)
 
+devConfig = dai.Device.Config()
+if 1:
+    devConfig.preboot.watchdogTimeoutMs = 0
+    print("[CONFIG WARNING] Device watchdog disabled. A power-cycle is required"
+          " before next run in case of unclean app exit")
+if 1:
+    devConfig.preboot.usb.maxSpeed = dai.UsbSpeed.HIGH
+    print("[CONFIG WARNING] USB limited to high-speed (USB2)")
+
 # Connect to the device
-with dai.Device(pipeline, dai.UsbSpeed.SUPER) as device:
+with dai.Device(devConfig) as device:
     # Print out available cameras
     print('Connected cameras: ', device.getConnectedCameras())
     # Print out usb speed
     print('Usb speed: ', device.getUsbSpeed().name)
+
+    device.startPipeline(pipeline)
 
     # Output queue will be used to get the rgb frames from the output defined above
     qRgb = device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
