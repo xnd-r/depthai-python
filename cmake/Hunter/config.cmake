@@ -1,7 +1,7 @@
-# Pybind11 2.7.0
+# Pybind11 2.8.1
 hunter_config(
     pybind11
-    VERSION "2.7.0"
-    URL "https://github.com/pybind/pybind11/archive/refs/tags/v2.7.0.tar.gz"
-    SHA1 "3a7010e5952c56e08c8f9b7d6fb458a173fd585a"
+    VERSION "2.8.1"
+    URL "https://github.com/pybind/pybind11/archive/refs/tags/v2.8.1.tar.gz"
+    SHA1 "7b4431c10817e5e48e6ee4f0e5fecdbd85763dcd"
 )
