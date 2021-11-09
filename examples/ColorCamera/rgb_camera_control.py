@@ -47,7 +47,7 @@ stillMjpegOut.setStreamName('still')
 previewOut.setStreamName('preview')
 
 # Properties
-camRgb.setVideoSize(640, 360)
+camRgb.setVideoSize(1920, 1080)
 camRgb.setPreviewSize(300, 300)
 videoEncoder.setDefaultProfilePreset(camRgb.getVideoSize(), camRgb.getFps(), dai.VideoEncoderProperties.Profile.MJPEG)
 stillEncoder.setDefaultProfilePreset(camRgb.getStillSize(), 1, dai.VideoEncoderProperties.Profile.MJPEG)
@@ -93,6 +93,11 @@ with dai.Device(pipeline) as device:
     sensMin = 100
     sensMax = 1600
 
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    fontScale = 1
+    thickness = 2
+    line = cv2.LINE_AA
+
     while True:
         previewFrames = previewQueue.tryGetAll()
         for previewFrame in previewFrames:
@@ -102,6 +107,15 @@ with dai.Device(pipeline) as device:
         for videoFrame in videoFrames:
             # Decode JPEG
             frame = cv2.imdecode(videoFrame.getData(), cv2.IMREAD_UNCHANGED)
+
+            # Get exposure&iso
+            exposure_time = videoFrame.getExposureTime()
+            sensitivity = videoFrame.getSensitivity()
+            cv2.putText(frame, "Exposure: {}".format(exposure_time),
+                        (50, 50), font, fontScale, (255, 255, 255), thickness, line)
+            cv2.putText(frame, "Sensitivity: {}".format(sensitivity),
+                        (50, 100), font, fontScale, (255, 255, 255), thickness, line)
+
             # Display
             cv2.imshow('video', frame)
 
@@ -140,9 +154,10 @@ with dai.Device(pipeline) as device:
             ctrl.setAutoFocusMode(dai.CameraControl.AutoFocusMode.CONTINUOUS_VIDEO)
             controlQueue.send(ctrl)
         elif key == ord('e'):
-            print("Autoexposure enable")
             ctrl = dai.CameraControl()
             ctrl.setAutoExposureEnable()
+            print("Autoexposure enable. Exposure: {}, Sensitivity: {}".format(
+                ctrl.getExposureTime(), ctrl.getSensitivity()))
             controlQueue.send(ctrl)
         elif key in [ord(','), ord('.')]:
             if key == ord(','): lensPos -= LENS_STEP
