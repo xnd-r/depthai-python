@@ -19,8 +19,8 @@ import cv2
 # Step size ('W','A','S','D' controls)
 STEP_SIZE = 8
 # Manual exposure/focus set step
-EXP_STEP = 500  # us
-ISO_STEP = 50
+EXP_STEP = 100  # us
+ISO_STEP = 10
 LENS_STEP = 3
 
 def clamp(num, v0, v1):
@@ -48,7 +48,7 @@ previewOut.setStreamName('preview')
 
 # Properties
 camRgb.setVideoSize(1920, 1080)
-camRgb.setPreviewSize(300, 300)
+camRgb.setPreviewSize(640, 640)
 videoEncoder.setDefaultProfilePreset(camRgb.getVideoSize(), camRgb.getFps(), dai.VideoEncoderProperties.Profile.MJPEG)
 stillEncoder.setDefaultProfilePreset(camRgb.getStillSize(), 1, dai.VideoEncoderProperties.Profile.MJPEG)
 
@@ -95,26 +95,29 @@ with dai.Device(pipeline) as device:
 
     font = cv2.FONT_HERSHEY_SIMPLEX
     fontScale = 1
+    color = (0, 0, 255)
     thickness = 2
     line = cv2.LINE_AA
 
     while True:
         previewFrames = previewQueue.tryGetAll()
         for previewFrame in previewFrames:
-            cv2.imshow('preview', previewFrame.getData().reshape(previewFrame.getWidth(), previewFrame.getHeight(), 3))
+            # Get exposure&iso
+            exposure_time = previewFrame.getExposureTime()
+            sensitivity = previewFrame.getSensitivity()
+
+            frame = previewFrame.getData().reshape(previewFrame.getWidth(), previewFrame.getHeight(), 3)
+            cv2.putText(frame, "Exposure: {}".format(exposure_time),
+                        (50, 50), font, fontScale, color, thickness, line)
+            cv2.putText(frame, "Sensitivity: {}".format(sensitivity),
+                        (50, 100), font, fontScale, color, thickness, line)
+
+            cv2.imshow('preview', frame)
 
         videoFrames = videoQueue.tryGetAll()
         for videoFrame in videoFrames:
             # Decode JPEG
             frame = cv2.imdecode(videoFrame.getData(), cv2.IMREAD_UNCHANGED)
-
-            # Get exposure&iso
-            exposure_time = videoFrame.getExposureTime()
-            sensitivity = videoFrame.getSensitivity()
-            cv2.putText(frame, "Exposure: {}".format(exposure_time),
-                        (50, 50), font, fontScale, (255, 255, 255), thickness, line)
-            cv2.putText(frame, "Sensitivity: {}".format(sensitivity),
-                        (50, 100), font, fontScale, (255, 255, 255), thickness, line)
 
             # Display
             cv2.imshow('video', frame)
