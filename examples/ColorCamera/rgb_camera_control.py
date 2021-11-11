@@ -112,7 +112,7 @@ with dai.Device(pipeline) as device:
     line = cv2.LINE_AA
 
     # Frame frops are possible
-    with open(os.path.join(folder_name, 'color.h265'), 'wb') as fileColorH265:
+    with open(join(folder_name, 'color.h265'), 'wb') as fileColorH265:
         while True:
             previewFrames = previewQueue.tryGetAll()
             for previewFrame in previewFrames:
@@ -132,11 +132,11 @@ with dai.Device(pipeline) as device:
             for videoFrame in videoFrames:
                 # Decode JPEG
                 frame_data = videoFrame.getData()
-                frame = cv2.imdecode(frame_data, cv2.IMREAD_UNCHANGED)
                 frame_data.tofile(fileColorH265)
+                # frame = cv2.imdecode(frame_data, cv2.IMREAD_UNCHANGED)
 
                 # Display
-                cv2.imshow('video', frame)
+                # cv2.imshow('video', frame)
 
                 # Send new cfg to camera
                 if sendCamConfig:
